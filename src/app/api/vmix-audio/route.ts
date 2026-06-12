@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { parseStringPromise } from 'xml2js';
 
@@ -52,3 +53,4 @@ export async function GET() {
     );
   }
 }
+
