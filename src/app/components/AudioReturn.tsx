@@ -8,6 +8,7 @@ export default function AudioReturn() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [volume,   setVolume]   = useState(1.0);
+  const wasPlayingRef = useRef(false);
 
   const startStream = useCallback(() => {
     const audio = audioRef.current;
@@ -48,6 +49,24 @@ export default function AudioReturn() {
     setLoading(false);
     setError(null);
   }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (playing) {
+          wasPlayingRef.current = true;
+          stopStream();
+        }
+      } else {
+        if (wasPlayingRef.current) {
+          wasPlayingRef.current = false;
+          startStream();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [playing, stopStream, startStream]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;

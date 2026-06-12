@@ -19,6 +19,13 @@ export default function VmixController() {
   const [isSettingsView, setIsSettingsView] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [isHubMode, setIsHubMode] = useState<boolean | null>(null);
+  const [isAppVisible, setIsAppVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => setIsAppVisible(document.visibilityState === 'visible');
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   // --- Monitor de Video ---
   const [monitorSrc, setMonitorSrc] = useState<string | null>(null);
@@ -70,10 +77,11 @@ export default function VmixController() {
   }, []);
 
   useEffect(() => {
+    if (!isAppVisible) return;
     fetchVmixState();
     const interval = setInterval(fetchVmixState, 500);
     return () => clearInterval(interval);
-  }, [fetchVmixState]);
+  }, [fetchVmixState, isAppVisible]);
 
   const fetchFrame = useCallback(() => {
     const timestamp = Date.now();
@@ -96,7 +104,7 @@ export default function VmixController() {
   }, []);
 
   useEffect(() => {
-    if (isMonitorVisible && !isSettingsView) {
+    if (isMonitorVisible && !isSettingsView && isAppVisible) {
       fetchFrame();
       monitorIntervalRef.current = setInterval(fetchFrame, 600);
     } else {
@@ -106,7 +114,7 @@ export default function VmixController() {
       }
     }
     return () => { if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current); };
-  }, [isMonitorVisible, isSettingsView, fetchFrame]);
+  }, [isMonitorVisible, isSettingsView, fetchFrame, isAppVisible]);
 
   const handleInputClick = async (inputId: string) => {
     try {
@@ -169,48 +177,72 @@ export default function VmixController() {
         {isSettingsView ? (
 
           /* Vista Ajustes */
-          <div className="p-4 space-y-6 overflow-y-auto h-full pb-10">
-            <div>
-              <h2 className="text-lg font-bold text-white mb-1">Entradas Visibles</h2>
-              <p className="text-sm text-neutral-400 mb-4">
-                Selecciona cuáles canales quieres tener a mano en tu botonera.
-              </p>
-              {inputs.length === 0 && isConnected && (
-                <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 text-center">
-                  <p className="text-neutral-400">Cargando entradas desde vMix...</p>
+          (() => {
+            const renderInput = (input: VmixInput, isSelected: boolean) => (
+              <label key={input.id}
+                className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all active:scale-[0.98]
+                  ${isSelected ? 'bg-blue-600/10 border-blue-500/30' : 'bg-neutral-900 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700'}`}
+              >
+                <div className="relative flex items-center justify-center shrink-0">
+                  <input type="checkbox" className="peer sr-only"
+                    checked={isSelected} onChange={() => toggleInputSelection(input.id)} />
+                  <div className="w-6 h-6 rounded-md border-2 border-neutral-600 bg-neutral-800 peer-checked:bg-blue-500 peer-checked:border-blue-500 transition-colors flex items-center justify-center">
+                    <svg className={`w-4 h-4 text-white transition-transform ${isSelected ? 'scale-100' : 'scale-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                  </div>
                 </div>
-              )}
-              <div className="grid gap-2.5">
-                {inputs.map((input) => {
-                  const isSelected = selectedInputIds.includes(input.id);
-                  return (
-                    <label key={input.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all active:scale-[0.98]
-                        ${isSelected ? 'bg-blue-600/10 border-blue-500/30' : 'bg-neutral-900 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700'}`}
-                    >
-                      <div className="relative flex items-center justify-center shrink-0">
-                        <input type="checkbox" className="peer sr-only"
-                          checked={isSelected} onChange={() => toggleInputSelection(input.id)} />
-                        <div className="w-6 h-6 rounded-md border-2 border-neutral-600 bg-neutral-800 peer-checked:bg-blue-500 peer-checked:border-blue-500 transition-colors flex items-center justify-center">
-                          <svg className={`w-4 h-4 text-white transition-transform ${isSelected ? 'scale-100' : 'scale-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-                          </svg>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="font-semibold text-neutral-200 truncate">{input.title}</span>
+                  <span className="text-xs font-mono text-neutral-500">Canal: {input.number}</span>
+                </div>
+              </label>
+            );
+
+            const selectedInputsList = inputs.filter(input => selectedInputIds.includes(input.id));
+            const availableInputsList = inputs.filter(input => !selectedInputIds.includes(input.id));
+
+            return (
+              <div className="p-4 space-y-6 overflow-y-auto h-full pb-10">
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-1">Entradas Visibles</h2>
+                  <p className="text-sm text-neutral-400 mb-4">
+                    Selecciona cuáles canales quieres tener a mano en tu botonera.
+                  </p>
+                  
+                  {inputs.length === 0 && isConnected && (
+                    <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 text-center">
+                      <p className="text-neutral-400">Cargando entradas desde vMix...</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-6">
+                    {selectedInputsList.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Elegidas</h3>
+                        <div className="grid gap-2.5">
+                          {selectedInputsList.map(input => renderInput(input, true))}
                         </div>
                       </div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-semibold text-neutral-200 truncate">{input.title}</span>
-                        <span className="text-xs font-mono text-neutral-500">Canal: {input.number}</span>
+                    )}
+
+                    {availableInputsList.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Disponibles para agregar</h3>
+                        <div className="grid gap-2.5">
+                          {availableInputsList.map(input => renderInput(input, false))}
+                        </div>
                       </div>
-                    </label>
-                  );
-                })}
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setIsSettingsView(false)}
+                  className="w-full py-4 bg-white hover:bg-neutral-200 text-black rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 sticky bottom-4 z-10">
+                  Listo
+                </button>
               </div>
-            </div>
-            <button onClick={() => setIsSettingsView(false)}
-              className="w-full py-4 bg-white hover:bg-neutral-200 text-black rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 sticky bottom-4 z-10">
-              Listo
-            </button>
-          </div>
+            );
+          })()
 
         ) : (
 

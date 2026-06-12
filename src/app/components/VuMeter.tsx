@@ -115,6 +115,13 @@ export default function VuMeter() {
 
   // State visible para rerender de labels
   const [muted, setMuted] = useState(false);
+  const [isAppVisible, setIsAppVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => setIsAppVisible(document.visibilityState === 'visible');
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   const setupCanvas = useCallback((el: HTMLCanvasElement | null) => {
     if (!el) return;
@@ -207,13 +214,14 @@ export default function VuMeter() {
   }, [setupCanvas, redraw]);
 
   useEffect(() => {
+    if (!isAppVisible) return;
     fetchAudio();
     const id = setInterval(fetchAudio, 80); // ~12 fps
     return () => {
       clearInterval(id);
       if (peakTimer.current) clearTimeout(peakTimer.current);
     };
-  }, [fetchAudio]);
+  }, [fetchAudio, isAppVisible]);
 
   const accentColor = muted ? "#00c8ff" : "#2a2a2a";
 

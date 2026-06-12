@@ -13,6 +13,7 @@ export default function VmixHub() {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newIp, setNewIp] = useState("");
+  const [statusMap, setStatusMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const stored = localStorage.getItem("vmixHubProfiles");
@@ -24,6 +25,34 @@ export default function VmixHub() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const checkStatuses = async () => {
+      const newStatusMap: Record<string, boolean> = {};
+      await Promise.all(
+        profiles.map(async (profile) => {
+          try {
+            const res = await fetch(`/api/check-status?ip=${profile.ip}`);
+            if (res.ok) {
+              const data = await res.json();
+              newStatusMap[profile.id] = data.online;
+            } else {
+              newStatusMap[profile.id] = false;
+            }
+          } catch {
+            newStatusMap[profile.id] = false;
+          }
+        })
+      );
+      setStatusMap((prev) => ({ ...prev, ...newStatusMap }));
+    };
+
+    if (profiles.length > 0) {
+      checkStatuses();
+      const interval = setInterval(checkStatuses, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [profiles]);
 
   const saveProfiles = (newProfiles: PCProfile[]) => {
     setProfiles(newProfiles);
@@ -99,7 +128,11 @@ export default function VmixHub() {
                   className="w-full flex items-center justify-between p-4 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-2xl transition-all active:scale-[0.98] group text-left"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-500 flex items-center justify-center shrink-0">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                      statusMap[profile.id] 
+                        ? "bg-green-600/20 text-green-500" 
+                        : "bg-red-600/20 text-red-500"
+                    }`}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect width="20" height="14" x="2" y="3" rx="2" />
                         <line x1="8" x2="16" y1="21" y2="21" />
